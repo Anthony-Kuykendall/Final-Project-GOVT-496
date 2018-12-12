@@ -1,0 +1,153 @@
+---
+title: "Segregated Choice: The Impact of Public School Closures on a Community"
+author: "Anthony Kuykendall"
+date: "December 5, 2018"
+output: beamer_presentation
+bibiliography: DCPSBib.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(maps)
+library(UScensus2010)
+library(UScensus2010tract)
+library(sp)
+library(maptools)
+library(rgeos)
+library(ggmap)
+# Reading and Tidying CSV Data Set
+closed_schools <- read.csv("ClosedDCPS.csv")
+colnames(closed_schools)[colnames(closed_schools)=="X"] <- "Longitude"
+colnames(closed_schools)[colnames(closed_schools)=="Y"] <- "Latitude"
+colnames(closed_schools)[colnames(closed_schools)=="FACUSE"] <- "Designation"
+colnames(closed_schools)[colnames(closed_schools)=="PS"] <- "PreSchool"
+colnames(closed_schools)[colnames(closed_schools)=="PK"] <- "PreK"
+colnames(closed_schools)[colnames(closed_schools)=="GR_1"] <- "Grade 1"
+colnames(closed_schools)[colnames(closed_schools)=="GR_2"] <- "Grade 2"
+colnames(closed_schools)[colnames(closed_schools)=="GR_3"] <- "Grade 3"
+colnames(closed_schools)[colnames(closed_schools)=="GR_4"] <- "Grade 4"
+colnames(closed_schools)[colnames(closed_schools)=="GR_5"] <- "Grade 5"
+colnames(closed_schools)[colnames(closed_schools)=="GR_6"] <- "Grade 6"
+colnames(closed_schools)[colnames(closed_schools)=="GR_7"] <- "Grade 7"
+colnames(closed_schools)[colnames(closed_schools)=="GR_8"] <- "Grade 8"
+colnames(closed_schools)[colnames(closed_schools)=="GR_9"] <- "Grade 9"
+colnames(closed_schools)[colnames(closed_schools)=="GR_10"] <- "Grade 10"
+colnames(closed_schools)[colnames(closed_schools)=="GR_11"] <- "Grade 11"
+colnames(closed_schools)[colnames(closed_schools)=="GR_12"] <- "Grade 12"
+colnames(closed_schools)[colnames(closed_schools)=="TOTAL_STUD"] <- "Total Students"
+
+# Snapshot of Schools Closed (Name, Designation, Year)
+school_designation <- subset(closed_schools, select = c(4, 6, 39))
+
+# Code for DC Map Figure Overlay with DCPS Closure Locations
+data("district_of_columbia.tract10")
+n_tract <- length(district_of_columbia.tract10)
+DC_base <- ggplot(data = district_of_columbia.tract10) + 
+  geom_polygon(mapping = aes(x = long, y = lat), color = "gray",
+                                    fill = NA, size = 0.5)
+DCPS_closures <- DC_base + 
+  geom_point(data = closed_schools, aes(x = Longitude, y = Latitude, color = Designation),
+                     na.rm = TRUE)
+
+# Code for Grade Breakdown Slide
+student_by_grade <- subset(closed_schools, select = c(10:25))
+Grade_Breakdown <- colSums(student_by_grade, na.rm = TRUE, dims = 1)
+
+# Code for Demographics
+CensusData <- read.csv("Census_Data.csv")
+library(data.table)
+setattr(CensusData, "row.names", c("5-9", "10-14", "15-17", "18-19", "Total"))
+
+# Code for Wards/School
+Ward_Breakdown <- read.csv("Ward_Breakdown.csv")
+
+Ward_Plot1 <- ggplot(data = Ward_Breakdown) +
+  geom_point(mapping = aes(x = Total, y = Schools, color = Ward))
+Ward_Plot2 <- ggplot(data = Ward_Breakdown) +
+  geom_point(mapping = aes(x = Total, y = Schools, color = Ward)) +
+  geom_smooth(mapping = aes(x = Total, y = Schools))
+
+# Code for LRM
+SchoolReg <- lm(Total~Schools, data = Ward_Breakdown)
+```
+
+## Introduction: The Premise
+
+- DCPS has an equity problem
+- More affluent, well off neighborhoods are able to outperform schools in struggling neighborhoods
+- 
+Between 2008-2013: 42 public schools closed, 28 of them elementary schools
+
+## Education and Childhood Development
+
+- A child's educational development is interlinked with cultural developments (Raikes 2017)
+- Educational structure can inforce positive cultural norms (Nugent 2014)
+- WV: Students lost time for studying, extracurriculars, and outside play due to new commutes established after school closures (Lee 2017)
+- Negative social implications to moving schools
+
+## DC Public School Closures
+
+```{r}
+DCPS_closures
+```
+
+## DC Ward Demographics: A Snapshot
+```{r}
+as.tibble(CensusData)
+```
+
+## Impact: Breakdown by Grade
+
+```{r}
+Grade_Breakdown
+```
+
+## The Question
+
+-Are you more likely to have a public school closed in your neighborhood if you are a black child than if you are a white child?
+
+## Wards Impacted by School Closures 2008-2013
+```{r}
+Ward_Breakdown
+```
+
+## Wards Impacted by School Closures
+```{r}
+Ward_Plot1
+```
+
+## Wards Impacted by School Closures
+```{r}
+Ward_Plot2
+```
+
+## Linear Regression Model
+- In this model, population of African Americans between the ages of 5 and 19 will be used as a predictor for the number of schools closing in a Ward.
+
+## LRM
+```{r}
+summary(SchoolReg)
+```
+
+## Regression Continued
+```{r}
+with(Ward_Breakdown, plot(Total, Schools))
+abline(SchoolReg)
+```
+
+## Policy Options
+- Schools close, but the story does not stop there
+- The rise of charter schools, particularly in DC could help
+- Parent participation in schools is a barrier worth looking into
+
+## Confounding Variables
+- Neighborhood Diversity within the Wards
+- Charter Schools/Non DCPS Presence
+- School Size
+- School Density in Areas
+
+## Limitations of the Study
+- Missing Data in School Closures
+- No Accompanying Data for Schools Open
+- Neighborhood Demographics Precision
