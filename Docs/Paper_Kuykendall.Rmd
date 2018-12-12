@@ -1,0 +1,177 @@
+---
+title: "Closing Time: A Case Study of DC Public School Closures"
+author: "Anthony Kuykendall"
+date: "December 12, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(maps)
+library(UScensus2010)
+library(UScensus2010tract)
+library(sp)
+library(maptools)
+library(rgeos)
+library(ggmap)
+
+# Reading and Tidying CSV Data Set
+closed_schools <- read.csv("ClosedDCPS.csv")
+colnames(closed_schools)[colnames(closed_schools)=="X"] <- "Longitude"
+colnames(closed_schools)[colnames(closed_schools)=="Y"] <- "Latitude"
+colnames(closed_schools)[colnames(closed_schools)=="FACUSE"] <- "Designation"
+colnames(closed_schools)[colnames(closed_schools)=="PS"] <- "PreSchool"
+colnames(closed_schools)[colnames(closed_schools)=="PK"] <- "PreK"
+colnames(closed_schools)[colnames(closed_schools)=="GR_1"] <- "Grade 1"
+colnames(closed_schools)[colnames(closed_schools)=="GR_2"] <- "Grade 2"
+colnames(closed_schools)[colnames(closed_schools)=="GR_3"] <- "Grade 3"
+colnames(closed_schools)[colnames(closed_schools)=="GR_4"] <- "Grade 4"
+colnames(closed_schools)[colnames(closed_schools)=="GR_5"] <- "Grade 5"
+colnames(closed_schools)[colnames(closed_schools)=="GR_6"] <- "Grade 6"
+colnames(closed_schools)[colnames(closed_schools)=="GR_7"] <- "Grade 7"
+colnames(closed_schools)[colnames(closed_schools)=="GR_8"] <- "Grade 8"
+colnames(closed_schools)[colnames(closed_schools)=="GR_9"] <- "Grade 9"
+colnames(closed_schools)[colnames(closed_schools)=="GR_10"] <- "Grade 10"
+colnames(closed_schools)[colnames(closed_schools)=="GR_11"] <- "Grade 11"
+colnames(closed_schools)[colnames(closed_schools)=="GR_12"] <- "Grade 12"
+colnames(closed_schools)[colnames(closed_schools)=="TOTAL_STUD"] <- "Total Students"
+
+# Snapshot of Schools Closed (Name, Designation, Year)
+school_designation <- subset(closed_schools, select = c(4, 6, 39))
+
+# Code for DC Map Figure Overlay with DCPS Closure Locations
+data("district_of_columbia.tract10")
+n_tract <- length(district_of_columbia.tract10)
+DC_base <- ggplot(data = district_of_columbia.tract10) + 
+  geom_polygon(mapping = aes(x = long, y = lat), color = "gray",
+                                    fill = NA, size = 0.5)
+DCPS_closures <- DC_base + 
+  geom_point(data = closed_schools, aes(x = Longitude, y = Latitude, color = Designation),
+                     na.rm = TRUE)
+
+# Code for Affected Grades Breakdown
+student_by_grade <- subset(closed_schools, select = c(10:25))
+Grade_Breakdown <- colSums(student_by_grade, na.rm = TRUE, dims = 1)
+
+# Code for Ward Population
+CensusData <- read.csv("Census_Data.csv")
+library(data.table)
+WardPop <- setattr(CensusData, "row.names", c("5-9", "10-14", "15-17", "18-19", "Total"))
+
+# Code for Ward by Closure Table
+Ward_Breakdown <- read.csv("Ward_Breakdown.csv")
+Rate_Closure <- mutate(Ward_Breakdown, Rate = Closed / (Closed + Schools))
+
+# Ward Plot 1
+Ward_Plot1 <- ggplot(data = Ward_Breakdown) +
+  geom_point(mapping = aes(x = Total, y = Schools, color = Ward))
+
+# Ward Plot 2
+Ward_Plot2 <- ggplot(data = Ward_Breakdown) +
+  geom_point(mapping = aes(x = Total, y = Schools, color = Ward)) +
+  geom_smooth(mapping = aes(x = Total, y = Schools))
+
+# LR Model Code
+SchoolReg <- lm(Closed~Total, data = Ward_Breakdown)
+```
+
+
+# Introduction
+There are few things as vital or as fundamental to a child's development as a strong education. In the list of character traits so often associated with the American Dream, it is the parent's role to take up a good job, and the child's to receive a good education, an American education. But what happens when the opportunities to obtain that education come with more barriers and closed doors than open environments for learning?
+
+The trends among public schools are not hard to miss, and that includes the troublesome ones. With frequent stories of overburdened, underfunded public school systems, particularly in urban areas, it can begin to seem like the public school system is beginning to show its true colors as nothing more than a failed experiment, with something coming to take its place. Some see the future in charter schools, and with an increasing trend among those who can afford it to place their children in private schooling, perhaps charter schools hold some of the answers. Looking at charter schools as the sole answer, however, would be only looking at one of the many different issues surrounding public education. It is not just that public schools are overburdened, their herd is thinning. Public schools are closing, and the consequences of these closures are felt by the impacted communities.
+
+In the District of Columbia between the years of 2008 and 2013, 42 public schools or public school properties aimed towards child development and education were closed permanently.
+```{r, include=TRUE}
+head(school_designation)
+```
+Of these 42 schools closed, 28 of them were Elementary Schools, which provide education from Kindergarten to 5th Grade, a pivotal point in a child's educational development. Clearly, the results of simple summary statistics on this data of public school closures in the District should be cause for alarm, but the situation becomes much more sinister when factoring in the location of these closures.
+
+Washington, D.C. has gone through many social and demographic changes in its history. At present day, a notable divider of class, wealth, and ultimately racial composition of the neighborhood, is Rock Creek Park, a forrested area that runs essentially from North to South in the District's Northwest quadrant. In the District, populations in Northwest and North Central DC are very typically more affluent than communities in Southwest, Southeast, and Northeast DC. Neighborhoods such as Congress Heights, Deanwood, and Anacostia are all predominantly black communities that have struggled, both in the watchful eye of the public, and in areas such as performance in schools and economic metrics. Surely areas like these would benefit from more investment into schools, rather than mass closures in these underperforming communities.
+
+The map below shows the outline of the District of Columbia, provided by the US Census Bureau. Overlayed on top is the geographic locations of public school properties closed by the District of Columbia Public Schools.
+```{r}
+DCPS_closures
+```
+One notable area left seemingly unblemished from these school closures is an area previously mentioned: the predominantly white, affluent Northwest neighborhoods. This data vizualization calls into question the very reason why public schools are closed. Does it have to do with an area's financial well-being, its demographic buildup, the engagement of its parents? Or, conversely, does the decision making process have less to do with location and more with overall performance of the school. Perhaps the two are even interlinked.
+
+# Literature Review: The Closure and its Aftershock
+When administrators decide to close a school, clearly something wrong has occurred. Whether it be a lack of funding, a failure to meet enrollment quotas, or deteriorating grounds, something obviously has gone so against the accepted norms that a school closure is warranted. The decision making process, however, can take many different forms, and very among administrators. Most typically, the decision to close a school will come from funding shortfalls, which can stem from a few different factors (Irwin & Seasons, 2012). Other reasons that may play a role in a school's subsequent closure is the viability ofthe school, demands for resources in other parts of the locality, and increasing costs associated with maintenance of an aging on-site facility (Irwin & Seasons, 2012). In Chicago, municipal school board officials marketed closures to parents as a way to streamline resources into a benefit for the "student experience"(Lee & Lubienski, 2017). Positive framing is one of the most effective tools an adminstrator can use to ease a neighborhood in the transition to a closed school, but often the effects of this event linger long after the education board goes back to city hall.
+
+Here, a word on the merits of childhood development is warranted, as any strain on the system of public education is ultimately going to have some impact, in some way, on the children enrolled in the school system. Raikes (2017) sees the development of a child and their culture they are brought up as "interwoven," forming a holistic and powerful sense of self that can be very influential in a child's development into an adult. This is why access to education is such a priority for advocates of social change, who see the norms of educational systems as positively reinforcing a culture that correlates with success within society (Nugent, 2014). The psychological effects associated with school closure, however, can undermine the validity of this culture, and change it for the worse. A study has shown that from the extra time used to transport students in West Virginia to a new school in place of the closed, children found study time, extracurricular activities, and recess all suffered cutbacks in time to account for the longer commute (Lee & Lubienski, 2017).
+
+An important interest area in the child development policy realm is that of inequities, which can persist through culturally skewed curriculums, or often unevenly distributed resources in school systems (Raikes, 2017). To be certain, a school closure in West Virginia has different implications than one in an urban district such as DC, prompting a different set of policy factors. For urban areas, the issue is not so much about access to resources, but rather the "equality of access" (Lee & Lubienski, 2017). It is not enough for students to be given the opportunity to attend a new school because this does not speak to obstacles in a new school.
+
+One potential factor of school relocation that is often overlooked deals not only with a child's integration into the culture of a new school, but also that of the parent. At Morningside Elementary School in the urban Woodbury School District of California, parents have established socially rigid and highly influential channels throughout the school through the Parent Teacher Organization (PTO) and similar collective bodies (Posey-Maddox, 2014). The issue with this sort of organizational structure, while at the outset seemingly beneficial to the child, can lay in the marginalization of students of low income and their families (Lott, 2003). At Morningside, the effects were seen firsthand as prominent PTO members were able to dominate conversations surrounding fundraising efforts, curriculum conversations, and even exercise some influence over the demographic makeup of the school (Posey-Maddox, 2014). But this does not have to be the case. In fact, researchers argue that parents can be a positive force in their children's academic upbringing regardless of income, but often lack strong social capital to do so (Lott, 2003).
+
+A more comprehensive approach to evaluating school closures may be needed in order to mitigate the dangerous effects the removal of a neighborhood institution can have on a community. As it stands, children in urban school districts are the most likely to be negatively impacted by a school closure (Nugent, 2014). So often, administrators are keen to look at schools and their performance "on the line," but scholars argue that citizen-focused approaches to school closures will actually lead to more positive outcomes for a school district (Irwin & Seasons, 2012). Current theories pose that school closures have classist and oppresive undertones to them, and it is the responsibility of school administrators to mitigate these if they do in fact exist (Lott, 2003). The consequences of a school closure are not even confined to just educational statuses, but can often affect socioeconomic factors in other parts of the community.
+
+Public school closures can have adverse effects on the neighborhood around them. One study found that the closure of a public school will lead to a decline in the value of housing and other properties in the neighborhood (Rosburg et al., 2017). This phenomenon occurs presumably from a lack of interest by incoming families in moving into a neighborhood that does not have a strong or even nearby school for children to attend to. In school environments where family involvement is so vital to educational statuses of neighborhoods, particularly in urban areas, a school closing can discourage even chances of educational recovery in the area (Posey-Maddox, 2014). In some cases, cities may seek to fill the gaps created by public school closures with a different approach to education: charter schools.
+
+Charter schools can be a valuable asset to a community because of their ability to use funding from the municipal government without necessarily having to abide by the same rules as other public education institutions. While factors such as fiscal crises, academic performance, and shifting demographics may be seen as reasons to close a school, charter schools are given more wiggle room to create successful outcomes for their students, typically in the curriculum they offer which can differ from federal or local standards (Nugent, 2014). It is false to say that charter schools are safe from closures, however, and with their closures come consequences. In fact, charter schools are more likely to close than traditional public schools because of these loosened accountability measures (Paino et al., 2017). Further, the incidents of charter school closings can wreck havoc on a neighborhood, leaving schools in states of uncertainty and disrupting the child development process (Raikes, 2017).
+
+A study conducted in 2017 found that in charter schools, a higher proportion of black sutdents led to a higher rate of closure (Paino et al., 2017). If this were to apply to traditional public education options, the ramifications would be enormous and warrant a change in the way administrators evaluate school closures. School closures are an issue of educational access for young students, which makes it an imperative to evaluate for potential biases (Lee & Lubienski, 2017). Therefore, a look at the DC Public School closures is warranted due to its status as a densely populated urban area with what are often perceived to be racially segregated wards. If there is a racial bias to DC school closures, the impact it can have on communities of color can further racial achievement gaps in education, and consequently have the potential to reinforce barriers of race in socioeconomic succeses.
+
+## DCPS Overview
+The current makeup of the DC Public School system is fairly standard for an urban city, with 118 school properties somewhat evenly distributed amongst the different wards. Between the years of 2008 and 2013, however, something unusual in the District began to take form. Schools were closing at an alarming rate, with 42 public school properties closing their doors to the children of the District. In looking at history, it may seem easy to point to issues such as the Financial Crisis, changes in city leadership, changes in federal leadership, all as catalysts of such closures. This was an unprecedented rate of public school closures, but surely there are factors at hand that could call for such extraordinary circumstances.
+
+In this period of closure, thousands of students were affected, but at first glimpse it may appear difficult to determine which students suffered the toughest losses.
+```{r}
+Grade_Breakdown
+```
+What becomes apparent, however, is a strong concentration of elementary school students impacted by school closures, which is consistent with the findings that elementary schools comprised a majority of affected schools. Further, it is important to recall the invaluable nature of educational upbringins and cultural foundations as a cause for concern for the state of DCPS closures (Raikes, 2017). Such numbers also do not take into account the individual sizes of schools, as some schools may serve larger student bodies, especially looking at high schools that have the potential to serve a much larger population.
+
+Even with these shortcomings in the data, however, it is important to realize that the impact of a school closure on a community can have lasting roots, no matter how small the school size. With effects on housing and economic development, as well as a child's psychological development, any school closure is going to leave a tangible impact. Grade, however, is not the only demographic data point worth looking at in this discussion of public school closures.
+
+## Ward Population and Public School Closures
+As previously mentioned, DC suffers from a perception of segregation among the different wards, with predominantly affluent neighborhoods dominating the Northwest contrasted by heavily black neighborhoods east of the Anacostia River. When looking at the affected communities of DC public school closures, it is important to look at each of them as distinct communities to reflect the diverse nature of the District. Based on available population data, the most precise metric to begin to gain ideas about the racial composition of neighborhoods was to evaluate the population of African Americans by Ward. The US Census Data from 2010 provides demographic data for a variety of age ranges, and coincidentally, falls right in perfectly with the time period of 2008 to 2013 that these school closures occurred in. Below is a breakdown of the African American population by Ward from ages 5-19, which is the most likely age demographic for someone to be attending a DCPS institution.
+```{r}
+WardPop
+```
+
+The data shows that Wards 7 and 8 have the highest population of black youths by a fairly large margin, with Ward 5 coming in about 5,0000 residents behind. Wards 7 and 8 are made up of the neighborhoods on the east side of the Anacostia, while Ward 5 covers a fairly large portion of the Northeast Quadrant, holding neighborhoods such as Brookland and NoMa. On the other side, Ward 3 makes up the most affluent Ward in the community for children, which is tucked up in the Northwest corner of the District, hosting American University and a portion of Rock Creek Park. There are certainly areas of the city with a higher population of African American youth, but this only shows a portion of the bigger picture, which seeks to analyze the intersection of race and educational policy.
+
+```{r}
+Rate_Closure
+```
+
+The figure above shows the number of school closures between 2008 and 2013 by Ward, compared to the number of schools currently still listed as active by DCPS and the number of black children that would be at the age to attend school. The last metric, Rate, shows the number of schools closed over the amount of schools that existed in the Ward before the closure, in an effort to quantify how much a school closure meant to a community when not all Wards have a uniform amount of schools in their area.
+
+Ward 5, while certainly being one of the larger Wards in DC on account of surface area, experienced a very high rate of school closures with about half of its DCPS properties being shut down in a span of 5 years. Wards 4 and 7 seems to be an exceptional case, with some of the highest numbers of schools in the District, and yet a relatively small number of school closures. What makes Ward 7 particularly interesting in the context of this research is that it has the second highest population of African American children, bested only by Ward 8. It is also certainly worth noting that Ward 3, which had far and away the lowest number of African American children residing in the Ward, had no school closures. Some of this may be due to the Ward's high socioeconomic performances when compared across the District, as well as due to a smaller crop of schools within the Ward limits.
+
+## Wards Impacted by School Closures: Linear Regression
+```{r}
+Ward_Plot1
+```
+Looking at the data visually, it may be hard for patterns to emerge that may indicate a trend among population and closures. In the figure up above, the population of African American children is treated as the variable on the x axis, with y plotting the number of schools closed, and each observation on the plot being its own Ward. There seem to be two obvious outliers from the rest in Wards 7 and 5. Ward 5 has an abnormally high amount of school closures, if in fact there were to be a positive correlation between total African American student population and school closures. Similarly, Ward 7 has an abnormally low number of school closures operating under this same assumed trend.
+
+Assumptions are rarely a valid form of statistical prediction, however, and clearly a more valid model should be used. Using some of the requisite functions in ggplot do not provide a lot of substantive information about the data set, save that there is much variability in predictions of where points on the plot will lie.
+```{r}
+Ward_Plot2
+```
+
+A linear regression model, on the other hand, will be able to evaluate the effectiveness of establishing a relationship between the two variables. In this model, the population of African Americans between the ages of 5 and 19 within a Ward will be used as a predictor for the number of schools closed in each Ward. In this case, each Ward serves as its own observation, which admittedly does leave to a fairly small sample size, but complications with the data made this one of very few viable modeling options.
+
+When running the linear regression model, a summary of the predictive power is returned and shown below.
+```{r}
+summary(SchoolReg)
+```
+```{r}
+with(Ward_Breakdown, plot(Total, Closed))
+abline(SchoolReg)
+```
+
+The results of the Linear Regression are not favorable for a statistical relationship between population of African American children and school closures. The p-value for this test is not significant at the .05 level, and the R-squared value, which shows how well data fits into the model, is relatively low at 0.26. The correlation, while positive, between the two variables does not seem to be statistically significant or strong. Ultimately, the data would support a finding that there is no racial bias to school closures in DC. At least, there would not be a statistically significant bias in the data.
+
+## Limitations of the Study
+There are a few limitations to this study, both in confounding variables within the model that were uneasy to account for, and in limitations of the actual data. While the results of this particular study indicate no statistical relationship between neighborhood racial composition and public school closures, perhaps a more robust model with larger pools of data would be able to yield a different approach. A few limiting factors of the study merit discussion.
+
+For starters, despite all of the narratives of segregation among Wards and varying levels of black populations in the city, there is still population variation within the Wards. The problem with this is that even in the midst of population variation, there is still segregation patterns in these Wards, mainly at the hands of neighborhood phenomena such as urban renewal and gentrification. Therefore, while only a few schools may be accounted for in a specific Ward, these closures still may have impacted one particular demographic community within the Ward more so than another.
+
+Further, this study incorporated charter schools into the theoretical discussion, but lacked the capacity to gather data on the operation of charter schools and other non-DCPS entities during this time. In adding to the sample size of the model, more observations at various institutions may have revealed patterns of closure among certain neighborhoods that were not able to register in the current model. Additionally, the entrance of charter schools or private schools into former DCPS neighborhoods could be seen as a means for neighborhood apeasement, and also be a factor in administrators' decisions to close a school.
+
+There was also the problem of the schools themselves, which had various population sizes and various distributions in neighborhoods, which were difficult to account for. While it is true that a school closure will have negative impacts on a community surrounding it, some schools will have larger impacts than others based on population sizes. Additionally, the cost of a school closure will be much more to an area with a low density of schools around. This was a difficult metric to measure, and one that ultimately was not able to be factored into the research methodology.
+
+## Conclusion
+Overall, there was no statisticla relationship established between racial populations and school closures, but this does not mitigate the effects and consequences of the state of public education in this country. Public education is still a flawed institution that is struggling due to a wealth of problems that have seen failed attempts bandage the problem for a second, but not in the long term. There are still racial biases in society, and almost undoubtedly still present in the factors schools face when on the brink of a closure. It is the responsibility of social scientists to research these factors and evaluate policy alternatives that are more inclusive, that empower American children to achieve a quality public education. Anything less than that is to deny the American Dream.
