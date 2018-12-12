@@ -1,4 +1,8 @@
 # Final-Project-GOVT-496
-This will serve as the repository for my final project.
-Additionally, I will begin to edit it so that I can add more comprehensive information about my project here. Maybe even an abstract?
-But wait, I can also edit from my local machine? That could be helpful if I do not have an internet connection!
+This is the repository for my final project on DCPS School Closures and racial biases.
+
+There are three folders: Code, Data, and Docs.
+
+The paper, as well as a presentation given in class can be found in the Docs folder.
+The code for all of the plots and nifty R things can be found in Code.
+The actual data used in the paper is found in Data.
